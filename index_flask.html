@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stack Overflow Tag Trends</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f9f9f9;
+        }
+
+        body.dark {
+            --bg-color: #121212;
+            --text-color: #ffffff;
+            --card-bg: #1f1f1f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .toolbar button {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark-toggle {
+            background-color: #444;
+            color: #fff;
+        }
+
+        .download-btn {
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        .pdf-btn {
+            background-color: #28a745;
+            color: #fff;
+        }
+
+        .chart-container {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        canvas {
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 2 / 1;
+}
+
+        .chart-description {
+            text-align: center;
+            font-size: 1rem;
+            max-width: 700px;
+            margin: 0 auto 2rem auto;
+            color: var(--text-color);
+        }
+
+        label, select {
+            display: block;
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        select {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>📊 Stack Overflow Tag Trends</h1>
+    <div class="toolbar">
+        <button class="dark-toggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+        <button class="download-btn" onclick="downloadCharts()">Download Charts</button>
+        <button class="pdf-btn" onclick="exportToPDF()">Export as PDF</button>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="lineChart"></canvas>
+    </div>
+    <div class="chart-description">
+      This line chart visualizes the monthly usage trends of various technologies from april 2022 to March 2025. Each colored line represents a specific technology or programming language, including Python, JavaScript, Java, React, Flutter, and many others.
+
+      One of the key takeaways from this graph is the significant growth in popularity of Python and JavaScript over time. Compared to other technologies, these two languages have shown a consistent upward trend, indicating their increasing demand and widespread adoption in the tech industry.
+      
+      Meanwhile, several other technologies maintain stable or declining usage patterns, helping viewers identify which skills are on the rise and which might be fading.
+      
+      This trend analysis is especially helpful for developers, learners, and recruiters to stay aligned with current industry demands.
+    </div>
+
+    <div class="chart-container">
+        <canvas id="barChart"></canvas>
+    </div>
+    <div class="chart-description">
+      This stacked bar chart illustrates the monthly usage distribution of various technologies, represented as percentages. Each bar corresponds to a month, and the segments within the bar show the relative share of each technology's usage during that time.
+
+      By using percentages, the chart enables a clear comparison of how the popularity of each technology changes over time, regardless of the total number of questions or entries in a given month. This makes it easy to spot trends, such as the rise or decline of specific technologies, and compare their proportional presence across different periods.
+    </div>
+
+    <h2 style="text-align:center">📆 Pie Chart by Month</h2>
+    <label for="monthSelect">Select Month:</label>
+    <select id="monthSelect" onchange="updatePieChart()"></select>
+    <div class="chart-container">
+        <canvas id="pieChart"></canvas>
+    </div>
+    <div class="chart-description">
+      This pie chart displays the monthly usage distribution of various programming languages and technologies. Each segment represents how frequently a particular language or technology appeared in that month.
+
+      The chart helps to track and compare the popularity of each language on a month-by-month basis. For March 2025, Python takes the lead by a wide margin, followed by JavaScript, Java, and a few others with smaller shares like C#, ReactJS, and Pandas.
+      
+      This visualization is part of a dynamic dashboard that allows users to select a specific month and instantly view the technology usage breakdown, offering valuable insights into tech trends over time.
+    </div>
+
+    <script>
+        let lineChart, pieChart, barChart;
+
+        const isDark = () => document.body.classList.contains("dark");
+
+        const chartOptions = {
+            plugins: {
+                legend: {
+                    labels: {
+                        color: () => isDark() ? '#fff' : '#000'
+                    }
+                },
+                title: {
+                    display: true,
+                    text: '',
+                    color: () => isDark() ? '#fff' : '#000'
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: () => isDark() ? '#fff' : '#000'
+                    },
+                    grid: {
+                        color: () => isDark() ? '#444' : '#ccc'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: () => isDark() ? '#fff' : '#000'
+                    },
+                    grid: {
+                        color: () => isDark() ? '#444' : '#ccc'
+                    }
+                }
+            }
+        };
+
+        async function fetchData() {
+            const trendRes = await fetch("https://ansraaz86.pythonanywhere.com/trend_data");
+            const trendData = await trendRes.json();
+            window.cachedTrendData = trendData;
+            updateLineChart();
+        }
+
+        async function populateMonthDropdown() {
+            const res = await fetch("https://ansraaz86.pythonanywhere.com/trend_data");
+            const data = await res.json();
+            const months = data.months;
+
+            const select = document.getElementById("monthSelect");
+            select.innerHTML = "";
+
+            months.forEach(month => {
+                const option = document.createElement("option");
+                option.value = month;
+                option.textContent = month;
+                select.appendChild(option);
+            });
+
+            select.value = months[months.length - 1];
+            await loadPieChart(select.value);
+        }
+
+        function updateLineChart() {
+    const trendData = window.cachedTrendData;
+    const labels = trendData.months;
+    const datasets = Object.entries(trendData.technologies).map(([tech, data], i) => ({
+        label: tech,
+        data,
+        borderColor: `hsl(${i * 40}, 70%, 50%)`,
+        backgroundColor: `hsl(${i * 40}, 70%, 60%)`,
+        fill: false,
+        tension: 0.3
+    }));
+
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+            ...chartOptions,
+            plugins: {
+                ...chartOptions.plugins,
+                title: {
+                    display: true,
+                    text: "Trend Line Chart - All Technologies",
+                    color: isDark() ? "#fff" : "#000"
+                }
+            }}});
+
+    updateBarChart();
+}
+
+function updateBarChart() {
+    const trendData = window.cachedTrendData;
+    const labels = trendData.months;
+    const datasets = Object.entries(trendData.technologies).map(([tech, values], idx) => ({
+        label: tech,
+        data: values,
+        backgroundColor: `hsl(${idx * 40}, 60%, 60%)`
+    }));
+    if (barChart) barChart.destroy();
+    barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: isDark() ? "#fff" : "#000" } },
+                title: {
+                    display: true,
+                    text: "Monthly Technology Usage - Stacked Bar Chart",
+                    color: isDark() ? "#fff" : "#000"
+                }
+            },
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: { color: isDark() ? '#fff' : '#000' },
+                    grid: { color: isDark() ? '#444' : '#ccc' }
+                },
+                y: {
+                    stacked: true,
+                    ticks: { color: isDark() ? '#fff' : '#000' },
+                    grid: { color: isDark() ? '#444' : '#ccc' }
+                }
+            }
+        }
+    });
+}                   
+        async function loadPieChart(month) {
+            const res = await fetch(`https://ansraaz86.pythonanywhere.com/pie_data?month=${month}`);
+            const pieData = await res.json();
+
+            const ctx = document.getElementById("pieChart").getContext("2d");
+            if (pieChart) pieChart.destroy();
+
+            pieChart = new Chart(ctx, {
+                type: "pie",
+                data: {
+                    labels: pieData.labels,
+                    datasets: [{
+                        data: pieData.values,
+                        backgroundColor: pieData.labels.map((_, i) => `hsl(${i * 40}, 70%, 60%)`)
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            labels: { color: isDark() ? "#fff" : "#000" }
+                        },
+                        title: {
+                            display: true,
+                            text: `Pie Chart - ${month}`,
+                            color: isDark() ? "#fff" : "#000"
+                        }
+                    }
+                }
+            });
+        }
+
+        function updatePieChart() {
+            const month = document.getElementById("monthSelect").value;
+            loadPieChart(month);
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark");
+            updateLineChart();
+            loadPieChart(document.getElementById("monthSelect").value);
+        }
+
+        function downloadCharts() {
+          [lineChart, barChart, pieChart].forEach((chart, i) => {
+              setTimeout(() => {
+                  const link = document.createElement('a');
+                  link.download = `chart_${i + 1}.png`;
+                  link.href = chart.canvas.toDataURL('image/png', 1.0);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+              }, 500 * (i + 1));  // Small delay to ensure rendering is complete
+          });
+      }
+      
+      function exportToPDF() {
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      
+          let charts = [lineChart, barChart, pieChart];
+          let y = 10;
+      
+          charts.forEach((chart, index) => {
+              const canvas = chart.canvas;
+              const imgData = canvas.toDataURL("image/png", 1.0);
+              const pageWidth = doc.internal.pageSize.getWidth();
+              const chartWidth = pageWidth - 20;
+      
+              doc.addImage(imgData, "PNG", 10, y, chartWidth, 70);
+              if (index < charts.length - 1) {
+                  doc.addPage();
+                  y = 10;
+              }
+          });
+      
+          doc.save("charts_export.pdf");
+      }
+      
+
+
+        fetchData();
+        populateMonthDropdown();
+    </script>
+</body>
+</html>
